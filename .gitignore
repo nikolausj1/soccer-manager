@@ -1,0 +1,13 @@
+*.xcodeproj
+Generated-Info.plist
+/build
+DerivedData
+.DS_Store
+xcuserdata
+.swiftpm
+.build
+_inbox/
+_review/
+Local/
+Project Build Guide.md
+.claude/settings.local.json

@@ -1,0 +1,41 @@
+name: SoccerManager
+options:
+  bundleIdPrefix: com.levelup
+  deploymentTarget:
+    iOS: "26.0"
+  xcodeVersion: "27.0"
+configs:
+  Debug: debug
+  Release: release
+packages:
+  SoccerManagerCore:
+    path: Packages/SoccerManagerCore
+targets:
+  SoccerManager:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Sources/SoccerManager
+    dependencies:
+      - package: SoccerManagerCore
+    info:
+      path: Generated-Info.plist
+      properties:
+        CFBundleDisplayName: "Soccer Manager"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        ITSAppUsesNonExemptEncryption: false
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.levelup.soccermanager
+        DEVELOPMENT_TEAM: 6A4J2GTB6F
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_VERSION: "5.0"
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
