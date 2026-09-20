@@ -2,7 +2,7 @@
 title: "Soccer Manager - Product Requirements Document"
 created: 2026-09-19
 modified: 2026-09-19
-version: 1.2
+version: 1.2.1
 author: Claude Fable 5.1 (claude-fable-5-1)
 tags:
 ---
@@ -218,6 +218,7 @@ Locked, from the interrogation, with the team-identity decision Justin made on 2
 - The `GK` badge, wherever the keeper appears, is green (`#006233`).
 - System fonts throughout, no custom typography.
 - Player names render at least at title text size, the single most important legibility requirement given outdoor glare and a two-second glance.
+- Each player row has three columns: name, badges and the readiness or rest bar on the left; the current shift or rest time (minutes and seconds) in a fixed-width middle column; the game total in whole minutes in a fixed-width far-right column, with the keeper's goal share as a caption under it. Section headers carry the column captions once (SHIFT and TOTAL on the field, REST and TOTAL on the bench).
 - Strong contrast between text and background.
 - Portrait only (locked), no landscape layout to design or test.
 - The team name "Algeria" is shown as the Game tab's title. It lives in a single named constant in the app layer; unlike the kids' names, which stay out of the repo entirely (Section 9), the team name is not personal information and needs no gitignored fixture.

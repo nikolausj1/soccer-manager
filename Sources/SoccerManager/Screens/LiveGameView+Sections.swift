@@ -10,7 +10,12 @@ extension LiveGameView {
     /// field slots, on a card tinted Algeria green.
     func fieldSection(snapshot: GameSnapshot, names: [UUID: String]) -> some View {
         LiveSectionCard(backgroundColor: Color.algeriaGreen.opacity(0.06)) {
-            sectionHeader("Field")
+            HStack(spacing: 12) {
+                sectionHeader("Field")
+                Spacer()
+                ColumnCaptions(middle: "Shift", right: "Total")
+            }
+            .padding(.trailing, columnCaptionTrailingCompensation)
         } content: {
             if let keeper = snapshot.keeper {
                 rowButton(.player(keeper), snapshot: snapshot) {
@@ -63,10 +68,12 @@ extension LiveGameView {
             Button {
                 select(.benchHeader, in: snapshot, now: .now)
             } label: {
-                HStack {
+                HStack(spacing: 12) {
                     sectionHeader("Bench", color: selected == .benchHeader ? Color.algeriaGreen : .secondary)
                     Spacer()
+                    ColumnCaptions(middle: "Rest", right: "Total")
                 }
+                .padding(.trailing, columnCaptionTrailingCompensation)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -99,6 +106,43 @@ extension LiveGameView {
     private func benchReadiness(for id: UUID, in snapshot: GameSnapshot) -> Readiness {
         let rested = snapshot.stats[id]?.currentBenchStintSeconds ?? 0
         return Readiness(ratio: rested / shiftLengthSeconds, showsUrgency: false)
+    }
+
+    /// `LiveSectionCard`'s title only gets 2pt of its own horizontal
+    /// padding on top of the card's shared 8pt inset, while a `PlayerRow`
+    /// below it adds a full 12pt of its own; this closes that 10pt gap so
+    /// the column captions land directly above `PlayerRow`'s columns.
+    private var columnCaptionTrailingCompensation: CGFloat { 10 }
+}
+
+/// The "SHIFT"/"REST" and "TOTAL" column captions, in the section header's
+/// own caption-caps style, over `PlayerRow`'s matching fixed-width
+/// columns. Hidden at accessibility text sizes: `PlayerRow` itself no
+/// longer lays out in those two columns there (see its own accessibility
+/// branch), and forcing this caption's text into the same fixed widths at
+/// a much larger point size only breaks it mid-word.
+private struct ColumnCaptions: View {
+    let middle: String
+    let right: String
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        if !dynamicTypeSize.isAccessibilitySize {
+            HStack(spacing: 12) {
+                caption(middle)
+                    .frame(width: PlayerRow.stintColumnWidth, alignment: .trailing)
+                caption(right)
+                    .frame(width: PlayerRow.totalColumnWidth, alignment: .trailing)
+            }
+        }
+    }
+
+    private func caption(_ text: String) -> some View {
+        Text(text)
+            .font(.caption.weight(.semibold))
+            .textCase(.uppercase)
+            .foregroundStyle(.secondary)
     }
 }
 
