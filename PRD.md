@@ -2,7 +2,7 @@
 title: "Soccer Manager - Product Requirements Document"
 created: 2026-09-19
 modified: 2026-09-19
-version: 1.0
+version: 1.1
 author: Claude Fable 5.1 (claude-fable-5-1)
 tags:
 ---
@@ -13,8 +13,18 @@ tags:
 |---|---|
 | **Product** | Soccer Manager, a sideline substitution tracker that keeps playing time even |
 | **Platform** | iOS |
-| **Status** | v1.0 PRD - agreed 2026-09-19 |
+| **Status** | v1.1 PRD - revised 2026-09-19 after the first v1.0 hands-on |
 | **Companion docs** | `Project Build Guide.md` (accounts, stack, deployment - follow it, do not restate it) |
+
+## Revision Notes
+
+**2026-09-19 (v1.1):** Justin's first hands-on with v1.0, shipped the same day.
+
+- **Half timer now counts down; player and bench timers still count up.** He wants time left in the half at a glance.
+- **"Next off" replaced by a readiness scale shown for every field player.** He runs five-minute shifts, so the flag was landing on the kid who had just come on; the scale also lets him override it for an injury or a behavior call.
+- **Half length and shift length became settings.** His games do not all run the same lengths.
+- **Delete a finished game and discard an in-progress game were added.** He is testing the app and needs to clear out games that were not real.
+- **An optional final score was added.** Nice to have on the record, never required.
 
 ## 1. Overview and Vision
 
@@ -72,6 +82,10 @@ Justin's context while using the app:
 - Season totals screen.
 - Screen stays awake while a game is live.
 - Survives force-quit and relaunch mid-game with no data loss.
+- Settings: half length and shift length, editable from Roster.
+- Delete a finished game, with confirmation.
+- Discard an in-progress game from the End Game dialog.
+- Optional final score, entered after End Game.
 
 **Out of scope (non-goals):**
 
@@ -82,7 +96,7 @@ Justin's context while using the app:
 - Sync or accounts. Everything lives on Justin's phone only; there is nothing to sign into and nothing to sync to in v1.
 - Editing a finished game's history, or editing any past event beyond Undo. Late taps cost the delay; that cost is accepted against "roughly equal."
 - Anything parent- or league-facing. Proof of playing time for parents or a league is explicitly not a goal, even though a per-game record exists as a byproduct.
-- Positions, formations, score, statistics beyond minutes and keeper stints. None of these serve the even-minutes problem.
+- Positions, formations. Statistics beyond minutes, keeper stints and a final score remain out. None of these serve the even-minutes problem.
 - Apple Watch. Deferred alongside the Live Activity it would pair with.
 - Landscape orientation. Portrait only, to match a one-handed pocket-to-glance motion.
 
@@ -98,7 +112,7 @@ Justin's context while using the app:
 
 1. **Glance beats interaction.** The live screen has to answer "who's next" from layout, ranking, and color alone, with no tap required. Every design choice on the Live screen defers to the two-second glance.
 2. **Undo beats confirm.** v1 keeps no edit history and asks no confirmation for a swap, because Justin's hands and attention are busy elsewhere. One tap of Undo recovers from a mistake faster than a confirmation dialog would have prevented one.
-3. **Even is a ranking, not an alert.** The app never tells Justin someone is due, it only ever shows the order. He decides when to look and when to act; the app supplies memory, not judgment.
+3. **Even is a ranking, not an alert.** The app never tells Justin someone is due, it only ever shows the order; readiness is shown for every field player, never a single flag. He decides when to look and when to act; the app supplies memory, not judgment.
 
 ## 6. Functional Requirements
 
@@ -106,13 +120,13 @@ Three tabs: **Game**, **Season**, **Roster**. Built in `SwiftUI` (locked). Every
 
 ### Roster
 
-Editable list of active players. Add a player by name. Rename in place. Archive via swipe; archived players are hidden from attendance but stay in season history.
+Editable list of active players. Add a player by name. Rename in place. Archive via swipe; archived players are hidden from attendance but stay in season history. A Settings section at the bottom holds two steppers: half length (5 to 45 minutes, by 5) and shift length (1 to 15 minutes).
 
 - Empty: no players yet. Shows "Add your players." and the add-player control. No game can be created until at least one player exists.
 
 ### Game tab
 
-If a game is currently in progress (state `setup`, `running` or `stopped`, anything not `finished`), this tab is the Live screen. Otherwise it is a list of past games, most recent first, each row a date and a one-line summary, with a "New game" button.
+If a game is currently in progress (state `setup`, `running` or `stopped`, anything not `finished`), this tab is the Live screen. Otherwise it is a list of past games, most recent first, each row a date and a one-line summary, with a "New game" button. A finished game can be swiped to delete, with confirmation; season totals recompute immediately to drop it.
 
 - Empty: no games played yet. Shows an empty-state message and the "New game" button, nothing else.
 
@@ -125,7 +139,7 @@ Attendance checklist over the active roster, every player checked by default. "S
 
 ### Live
 
-Header: half indicator (1st or 2nd, changeable only while the clock is stopped), elapsed time in the half, one Start/Stop control (Pause uses the same control). Field section: keeper slot, then outfield ranked most-played first, top row flagged **NEXT OFF**. Bench section: ranked least-played first, top row flagged **NEXT ON**. Every row shows name, current stint, game total, goal share if nonzero, and a `GK` badge for the keeper.
+Header: half indicator (1st or 2nd, changeable only while the clock is stopped), a countdown from the half length, one Start/Stop control (Pause uses the same control); past zero it reads "+m:ss" in red and keeps counting, never auto-stopping. Field section: keeper row first, stint and the `GK` badge, no bar; then outfield rows ordered longest current stint first, each with a readiness bar (fill is current stint divided by shift length: green under 60 percent, amber 60 to 100, red at or above 100 with a **DUE** badge), no **NEXT OFF** badge. Bench section: ranked least-played first, top row flagged **NEXT ON**, every row showing rested time. Every row shows name, current stint, game total, and goal share if nonzero.
 
 Selection model (locked, tap-tap swap): tap a row to select it, tap a second row to act, tap the same row again to deselect.
 
@@ -135,10 +149,10 @@ Selection model (locked, tap-tap swap): tap a row to select it, tap a second row
 - Bench player + an empty field slot selected: the bench player enters (covers fewer than 5 on the field).
 - Field player selected + "To bench" header: that player leaves the field without a replacement.
 
-Undo is labeled with what it will undo and is hidden entirely when there is nothing to undo. "End game" is shown only while the clock is stopped, and asks for confirmation before finishing. The screen is held awake (idle timer disabled) for as long as Live is on screen and the game is not `finished`.
+Undo is labeled with what it will undo and is hidden entirely when there is nothing to undo. End Game is shown in every state and opens a dialog: "End and save" stops the clock if running, then shows an optional Final score sheet (two steppers, Save or Skip) before the Summary; "Discard game" (destructive) deletes the game without saving, no stop needed; "Cancel" closes the dialog. The screen is held awake (idle timer disabled) for as long as Live is on screen and the game is not `finished`.
 
 - Empty (`setup`): no game yet in progress; the Game tab's empty state applies until a game is created.
-- Error: an action that is not currently legal (for example, tapping End Game while the clock runs) is simply not offered rather than shown and rejected. See the edge case table below for the specific cases this covers.
+- Error: an action that is not currently legal (for example, changing the half while the clock runs) is simply not offered rather than shown and rejected. See the edge case table below for the specific cases this covers.
 
 ### Summary
 
@@ -158,10 +172,10 @@ Four states: `setup`, `running`, `stopped`, `finished`.
 
 - **`setup`**: the game exists (created from the New Game sheet) but the clock has never started, no `clockStart` event has been recorded yet. Justin builds the initial lineup by tapping bench players onto field slots and designating a keeper; each tap-tap pair records a `lineup` snapshot event but nothing accrues time, since the clock has not run.
 - **`running`**: the clock is running (`clockRunning == true`). Time accrues to whichever players are on the field. Lineup changes are allowed and take effect immediately; they record a `lineup` event but never a clock event.
-- **`stopped`**: at least one `clockStart` has occurred, but the clock is not currently running. Covers both a mid-half pause and the gap between halves. Lineup changes are allowed and recorded, but accrue no time (success criterion 5). The half control is changeable only here. End Game is offered only here.
+- **`stopped`**: at least one `clockStart` has occurred, but the clock is not currently running. Covers both a mid-half pause and the gap between halves. Lineup changes are allowed and recorded, but accrue no time (success criterion 5). The half control is changeable only here.
 - **`finished`**: End Game was tapped and confirmed. Terminal state; the game moves into season totals and the Summary is shown. Nothing in a `finished` game can be edited in v1; Undo only ever acts on a game that is not yet finished.
 
-Transitions: `setup -> running` on the first Start. `running -> stopped` on Stop. `stopped -> running` on Start (resumes the current half, or begins the half just selected by the half control). `stopped -> finished` on End Game plus confirmation. Lineup edits happen inside `setup`, `running`, or `stopped` without changing the state itself.
+Transitions: `setup -> running` on the first Start. `running -> stopped` on Stop. `stopped -> running` on Start (resumes the current half, or begins the half just selected by the half control). `running -> finished` or `stopped -> finished` on End and save, which records a final clock stop first if the clock is running. Any state ends in deletion on Discard game. Lineup edits happen inside `setup`, `running`, or `stopped` without changing the state itself.
 
 ### Edge cases
 
@@ -173,8 +187,11 @@ Transitions: `setup -> running` on the first Start. `running -> stopped` on Stop
 | Fewer than 5 present | No minimum is enforced. The field can hold any number of players, including an empty slot; an empty field slot is filled by selecting a bench player next (see Live's selection model). |
 | Force-quit mid-half | On relaunch, the engine rebuilds the current `GameSnapshot` by replaying the full stored event log against the current time. If the log's last clock event was `clockStart`, the clock resumes running and every player's seconds reflect the full wall-clock gap; nothing is lost (success criterion 4). |
 | App backgrounded 10 minutes | Time is derived from event timestamps and wall-clock `now` at snapshot time, never from an in-process timer. Backgrounding changes nothing about what is stored; on foreground, every running player's seconds include the full 10 minutes (success criterion 3). |
-| End game tapped while running | Not reachable through the UI: the End Game control is shown only while the clock is `stopped`. Stop must be tapped first. |
+| End game tapped while running | Now allowed: End Game opens the dialog from any state. "End and save" stops the clock as it ends the game, then offers the score sheet; "Discard game" needs no stop first. |
 | Second half started without stopping first | Not reachable through the UI: the half control can only be changed while `stopped`, and starting the clock always begins accrual under whatever half is currently selected at that moment. |
+| Countdown reaches zero | Header turns red and counts up past zero as overtime ("+m:ss"); nothing stops automatically. |
+| Kid just came on | Sorts to the bottom of the field order, empty green readiness bar, never flagged **DUE**. |
+| Delete a finished game | Season totals recompute immediately and drop that game's minutes. |
 
 ## 7. Visual and Design Spec
 
@@ -182,7 +199,7 @@ Locked, from the interrogation, with the team-identity decision Justin made on 2
 
 - The team is **Algeria**; the palette is the flag. Background is white, light mode first, no dark mode requirement for v1.
 - Accent color and the **NEXT ON** highlight (top-ranked bench row): Algeria green `#006233`.
-- The **NEXT OFF** highlight (top-ranked outfield row): flag red `#D21034`.
+- Readiness bar under each outfield name: Algeria green `#006233` below 60 percent of the shift length, system amber from 60 to 100 percent, flag red `#D21034` at or above 100 percent with a red DUE badge. There is no NEXT OFF badge.
 - The `GK` badge, wherever the keeper appears, is green (`#006233`).
 - System fonts throughout, no custom typography.
 - Player names render at least at title text size, the single most important legibility requirement given outdoor glare and a two-second glance.
@@ -213,7 +230,7 @@ The read model, computed fresh on demand by `GameEngine.snapshot(events:, attend
 
 ### PlayerStats
 
-Per player, per game: `fieldSeconds`, `keeperSeconds`, `keeperStints`, `currentStintSeconds?`, `currentKeeperStintSeconds?`, `benchSeconds`.
+Per player, per game: `fieldSeconds`, `keeperSeconds`, `keeperStints`, `currentStintSeconds?`, `currentKeeperStintSeconds?`, `benchSeconds`, `currentBenchStintSeconds?`. The last is `nil` while the player is on the field, resets to zero on leaving it, and accumulates only while the clock runs.
 
 **Invariant (locked): time accrues only while the clock runs.** Seconds move only between a `clockStart` and the next `clockStop`, or up to `now` if the clock is currently running. Lineup changes recorded while the clock is stopped change nobody's seconds.
 
@@ -221,7 +238,9 @@ Per player, per game: `fieldSeconds`, `keeperSeconds`, `keeperStints`, `currentS
 
 Keeper stints increment by one on each lineup event where the keeper becomes a player who was not the keeper in the immediately previous snapshot; the first lineup event of the game that has a keeper at all counts as a stint too. Current stint resets to zero whenever a player enters the field, and accumulates only while the clock is running.
 
-Ranking: outfield sorted by `fieldSeconds` descending, tie broken by `currentStintSeconds` descending, then by attendance order. Bench sorted by `fieldSeconds` ascending, tie broken by `benchSeconds` descending, then attendance order. The keeper is never included in `rankedOutfield`. `nextOff` is the first ranked outfield player, `nextOn` is the first ranked bench player, both `nil` when their list is empty.
+Ranking: outfield sorted by `currentStintSeconds` descending, tie broken by `fieldSeconds` descending, then by attendance order. Bench sorted by `fieldSeconds` ascending, tie broken by `currentBenchStintSeconds` descending, then attendance order. The keeper is never included in `rankedOutfield`. `nextOff` is the first ranked outfield player, `nextOn` is the first ranked bench player, both `nil` when their list is empty.
+
+Half length and shift length are app settings (Roster, Section 6), never stored in the engine or a `GameEvent`. Readiness, including the DUE threshold, is computed in the app from `currentStintSeconds` and shift length, not by the engine.
 
 ### SeasonStats
 
@@ -234,7 +253,7 @@ Ranking: outfield sorted by `fieldSeconds` descending, tie broken by `currentSti
 Three record types persist this model, one to one, so the engine's pure functions can be re-run against stored data at any time with no migration:
 
 - `PlayerRecord`: roster identity, name, active or archived. Source of truth for the `attendance` lists and for names, which never enter the engine.
-- `GameRecord`: one per game, holding its date, its attendance (the `[UUID]` list the engine needs), and whether it is `finished`. Summary and Season both read finished `GameRecord`s.
+- `GameRecord`: one per game, holding its date, its attendance (the `[UUID]` list the engine needs), whether it is `finished`, and optional `ourScore: Int?` and `theirScore: Int?`. Summary and Season both read finished `GameRecord`s.
 - `GameEventRecord`: one row per `GameEvent`, append-only, persisting `id`, `at`, `kind`, `half`, `onField`, and `keeper` exactly as the engine defines them. Never edited in place, only appended to (a new lineup event) or trimmed from the tail (Undo).
 
 Every `GameEvent` is saved immediately when it is recorded, so a force-quit never loses more than a write already in flight.
@@ -302,6 +321,16 @@ Architecture is a straight line: `SwiftUI` views read a `GameSnapshot` computed 
 - [ ] Season's empty state shows before any game has been finished.
 - [ ] Season, once populated, sorts players by goal stints ascending then goal minutes ascending, so the top row is whoever is most due in goal.
 - [ ] The screen stays awake (idle timer disabled) for the entire time Live is on screen with the game not `finished`, and idle-timer behavior returns to normal otherwise.
+- [ ] The Live header shows a countdown from the half length, not elapsed time.
+- [ ] Past zero, the header shows "+m:ss" in red and keeps counting; the clock never auto-stops.
+- [ ] Each outfield row shows a readiness bar: green under 60 percent, amber 60 to 100, red with a DUE badge at or above 100.
+- [ ] Each bench row shows rested time.
+- [ ] Roster's Settings section offers half length (5 to 45 minutes, by 5) and shift length (1 to 15 minutes) steppers; a change takes effect immediately.
+- [ ] Swiping a finished game in the Game tab offers delete, with confirmation required first.
+- [ ] The End Game dialog's "Discard game" option deletes the game without saving, from any state.
+- [ ] The Final score sheet offers Save and Skip; Skip leaves both scores unset.
+- [ ] A saved final score appears in the Game tab's list row and in the Summary.
+- [ ] An existing store from before this model change opens with no data loss, `currentBenchStintSeconds`, `ourScore`, and `theirScore` reading unset for games saved under the old model.
 
 ## 12. Risks and Open Questions
 
@@ -311,10 +340,10 @@ Architecture is a straight line: `SwiftUI` views read a `GameSnapshot` computed 
 - **The iOS 27 simulator runtime is not installed on this Mac.** Xcode 27.0 carries the SDK but not a matching simulator runtime; only 18.3 and 26.5 are installed. Mitigation: build and simulate against a 26.0 deployment target for now (Section 9), revisit the floor once the runtime is available.
 - **Disk space.** About 20 GB free at the time of writing is not enough headroom to comfortably download an additional simulator runtime. Mitigation: keep using the installed 26.5 runtime for sim-verification, do not attempt a runtime download until more space is freed.
 - **XcodeGen can drop a resource silently.** Adding a file to the project without regenerating, or a misconfigured resource path, can produce a build that succeeds but ships without an asset. Mitigation: rerun `xcodegen generate` after adding any resource and confirm it by listing the contents of the built `.app`, not just by a green build.
+- **Readiness thresholds (60 percent amber) are a guess.** Mitigation: tune after two games.
 
 **Open questions (non-blocking, ask Justin, do not decide):**
 
-- Show the gap from even ("+3", "-4") beside or instead of raw game totals. Decide at screen design, in `_review/` mockups.
-- Half length: fixed at 20 minutes for v1, or a setting. Placeholder rule: fixed at 20, no auto-stop, so it only affects the display.
+- Show the gap from even ("+3", "-4") beside or instead of raw game totals. Decide at screen design, in `_review/` mockups. Less pressing now that readiness is shown per row, but still open.
 - Fewer than 5 kids present: the app allows any number on the field. Placeholder rule: no minimum enforced.
 - Jersey numbers on the roster: not in v1 unless Justin asks.
