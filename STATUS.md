@@ -2,7 +2,7 @@
 title: "STATUS - Soccer Manager"
 created: 2026-09-19
 modified: 2026-09-19
-version: 1.1
+version: 1.2
 author: Claude Fable 5.1 (claude-fable-5-1)
 tags:
 ---
@@ -15,22 +15,22 @@ An iOS app Justin runs on his phone on the sideline so the kids he coaches get r
 
 ## Stage
 
-Active Development
+MVP
 
 ## Health
 
-🟢 On-track. Interrogation complete, PRD v1.0 agreed 2026-09-19, build underway, deploy to Justin's phone pre-authorized.
+🟢 On-track. v1.0 built, verified on the simulator (7 of 7 acceptance criteria, 23 engine tests), tagged, and installed on Justin's iPhone on 2026-09-19. Not yet used in a real game.
 
 ## Waiting on Me
 
-- [ ] **Use it in the next game and report what broke** (one game)
+- [ ] **Enter the real roster in the app on the phone, then use it in the next game and report what broke** (5 min setup, one game)
       - unblocks: v1.1 decisions (backdate nudge, half-length setting, gap-from-even display)
 
 ## Next Up
 
-1. Engine and tests.
-2. Screens and simulator screenshots into `_review/`.
-3. Commit, tag `v1.0`, deploy via Recipe A.
+1. Justin runs one real game on v1.0 and reports.
+2. Triage the report into v1.1 (Ideas Shelf has the candidates).
+3. Free disk space, install the iOS 27 simulator runtime, raise the deployment floor to 27.
 
 ## Biggest Risk
 
@@ -68,6 +68,10 @@ Locked decisions from the interrogation; see `PRD.md` for full detail on each.
 - **Start-new-season archive** (M): close out the current season and begin a fresh one without losing history.
 
 ## Lessons
+
+- `xcrun devicectl device install app` fails with CoreDeviceError 10003 "device was still locked" when the iPhone is locked. A retry loop every 20 seconds until the unlock works well and needs no human timing; tell Justin to unlock the phone before Recipe A.
+- XcodeGen does not set `ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME` or `ASSETCATALOG_COMPILER_APPICON_NAME`. Without both in `project.yml` `settings.base`, the AccentColor asset is silently ignored (everything renders system blue) and the AppIcon set is not used. Add both to every iOS `project.yml`.
+- The iOS Simulator MCP tool's `inspect` action was unavailable in this session while `tap`, `button` and `screenshot` worked; coordinates were calibrated from screenshot scale instead. Launch-argument seeding for every screen state (`-resetData`, `-seedRoster`, `-autostart...`) made the screenshot pass repeatable and is worth building into every app from the first screen.
 
 - Xcode 27.0 on this Mac carries the iOS 27 SDK but no iOS 27 simulator runtime, only 26.5 and 18.3 are installed, and about 20 GB free disk made downloading one a bad idea. The deployment target is 26.0 until disk space frees up.
 - The Build Guide's repo-create example uses `--public` while a project's own `CLAUDE.md` may ask for private, so the flag is a per-project decision to confirm, not something to copy from the example. Justin chose public here.
