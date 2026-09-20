@@ -34,7 +34,7 @@ extension LiveGameView {
                         name: names[id] ?? "Unknown",
                         stats: snapshot.stats[id] ?? PlayerStats(),
                         isOnField: true,
-                        readiness: readiness(for: id, in: snapshot),
+                        readiness: outfieldReadiness(for: id, in: snapshot),
                         isSelected: selected == .player(id)
                     )
                 }
@@ -76,6 +76,7 @@ extension LiveGameView {
                     PlayerRow(
                         name: names[id] ?? "Unknown",
                         stats: snapshot.stats[id] ?? PlayerStats(),
+                        readiness: benchReadiness(for: id, in: snapshot),
                         statusBadge: index == 0 ? .nextOn : nil,
                         isSelected: selected == .player(id)
                     )
@@ -84,11 +85,20 @@ extension LiveGameView {
         }
     }
 
-    /// This player's stint measured against the configured shift length,
-    /// for the readiness bar under their field row.
-    private func readiness(for id: UUID, in snapshot: GameSnapshot) -> Readiness {
+    /// This player's current stint measured against the configured shift
+    /// length, for the readiness bar under their field row: green under
+    /// 0.6, amber to 1.0, red (and DUE) at or past it.
+    private func outfieldReadiness(for id: UUID, in snapshot: GameSnapshot) -> Readiness {
         let stint = snapshot.stats[id]?.currentStintSeconds ?? 0
-        return Readiness(ratio: stint / shiftLengthSeconds)
+        return Readiness(ratio: stint / shiftLengthSeconds, showsUrgency: true)
+    }
+
+    /// This player's rested time measured against the configured shift
+    /// length, for the meter under their bench row: always green, since
+    /// rest is never urgent the way an overdue stint is.
+    private func benchReadiness(for id: UUID, in snapshot: GameSnapshot) -> Readiness {
+        let rested = snapshot.stats[id]?.currentBenchStintSeconds ?? 0
+        return Readiness(ratio: rested / shiftLengthSeconds, showsUrgency: false)
     }
 }
 

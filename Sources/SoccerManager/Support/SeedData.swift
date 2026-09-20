@@ -56,7 +56,7 @@ enum SeedData {
     /// readiness bars at red, amber, and green all at once.
     ///
     /// - Parameter stopped: When true, the clock is stopped thirty seconds
-    ///   ago instead of left running.
+    ///   ago (half 1) instead of left running, so the game is at halftime.
     static func autostartLiveGame(context: ModelContext, stopped: Bool) {
         let ids = activePlayerIDs(context: context)
         guard ids.count >= 6 else { return }

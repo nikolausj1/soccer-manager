@@ -13,13 +13,16 @@ enum Selection: Equatable {
 }
 
 /// The tap-tap substitution screen: clock, ranked field and bench, and
-/// Undo. The only screen that mutates a game's event log directly.
+/// Undo. The only screen that mutates a game's event log directly. Reached
+/// by pushing onto `GamesView`'s `NavigationStack` from its in-progress
+/// row; it hides the tab bar for as long as it's on screen, so the Back
+/// button is the only way out.
 ///
 /// Layout is three fixed regions, not one scrolling page: `ClockHeader` is
-/// pinned above the scrolling field and bench lists, and Undo plus the End
-/// Game footer sit in a bottom `safeAreaInset` above the tab bar. Only the
+/// pinned above the scrolling field and bench lists, and Undo plus the
+/// phase-driven footer button sit in a bottom `safeAreaInset`. Only the
 /// field and bench rows scroll. Field and bench rendering lives in
-/// `LiveGameView+Sections.swift`; the bottom bar and its dialogs live in
+/// `LiveGameView+Sections.swift`; the bottom bar and its alerts live in
 /// `LiveGameView+Footer.swift`; the tap-resolution engine calls live in
 /// `LiveGameView+Actions.swift`.
 struct LiveGameView: View {
@@ -32,8 +35,8 @@ struct LiveGameView: View {
     @AppStorage(AppSettings.shiftLengthMinutesKey)
     var shiftLengthMinutes = AppSettings.defaultShiftLengthMinutes
 
-    @State var selectedHalf = 1
     @State var selected: Selection?
+    @State var showEndHalfConfirm = false
     @State var showEndGameConfirm = false
     @State var showScoreSheet = false
 
@@ -55,13 +58,15 @@ struct LiveGameView: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
             let snapshot = store.snapshot(for: game, now: timeline.date)
+            let events = game.events.map(\.event)
+            let phase = GamePhase.current(events: events, snapshot: snapshot)
             let names = Dictionary(uniqueKeysWithValues: allPlayers.map { ($0.id, $0.name) })
 
             VStack(spacing: 0) {
                 ClockHeader(
                     snapshot: snapshot,
-                    selectedHalf: $selectedHalf,
-                    onToggleClock: { toggleClock(snapshot: snapshot, now: timeline.date) }
+                    phase: phase,
+                    onStartHalf: { startHalf(phase == .kickoff ? 1 : 2, now: .now) }
                 )
 
                 ScrollView {
@@ -74,7 +79,7 @@ struct LiveGameView: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                bottomBar(snapshot: snapshot, names: names, now: timeline.date)
+                bottomBar(snapshot: snapshot, names: names, now: timeline.date, phase: phase)
             }
             .sheet(isPresented: $showScoreSheet, onDismiss: {
                 store.finish(game: game, at: pendingEndedAt ?? .now)
@@ -83,11 +88,10 @@ struct LiveGameView: View {
                 ScoreSheet(game: game)
             }
         }
-        .onAppear {
-            selectedHalf = store.snapshot(for: game, now: .now).currentHalf
-        }
-        .navigationTitle(TeamConfig.name)
+        .navigationTitle("\(TeamConfig.name) \u{00B7} \(game.createdAt.formatted(Date.FormatStyle().month(.abbreviated).day()))")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(false)
+        .toolbar(.hidden, for: .tabBar)
         .keepsScreenAwake(!game.isFinished)
     }
 

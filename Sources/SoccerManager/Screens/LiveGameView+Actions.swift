@@ -114,13 +114,12 @@ extension LiveGameView {
         selected = nil
     }
 
-    /// Appends the clock event `selectedHalf` and the clock's current
-    /// running state call for.
-    func toggleClock(snapshot: GameSnapshot, now: Date) {
-        let event: GameEvent = snapshot.clockRunning
-            ? .clockStop(at: now, half: selectedHalf)
-            : .clockStart(at: now, half: selectedHalf)
-        store.append(event, to: game)
+    /// Appends the `clockStart` event that begins `half`: the kickoff
+    /// pill starts half 1, the halftime pill starts half 2. Ending a half
+    /// or the game appends its own `clockStop` directly in
+    /// `LiveGameView+Footer.swift`, next to the alert that triggers it.
+    func startHalf(_ half: Int, now: Date) {
+        store.append(.clockStart(at: now, half: half), to: game)
     }
 
     /// Describes what the Undo button will do, per the Live screen's

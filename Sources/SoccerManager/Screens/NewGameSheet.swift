@@ -4,6 +4,10 @@ import SwiftData
 /// The attendance checklist shown before a new game starts. Every active
 /// player is checked by default; Start is disabled with nobody checked.
 struct NewGameSheet: View {
+    /// Called with the newly created game right before the sheet
+    /// dismisses, so the caller can push it onto its navigation path.
+    var onCreate: (GameRecord) -> Void = { _ in }
+
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Query(filter: #Predicate<PlayerRecord> { !$0.isArchived }, sort: \PlayerRecord.sortOrder)
@@ -60,6 +64,7 @@ struct NewGameSheet: View {
         let game = GameRecord(attendance: attendance)
         context.insert(game)
         try? context.save()
+        onCreate(game)
         dismiss()
     }
 }

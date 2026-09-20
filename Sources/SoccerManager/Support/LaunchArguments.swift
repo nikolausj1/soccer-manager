@@ -23,7 +23,13 @@ enum LaunchArguments {
         if args.contains("-autostartLiveGame") {
             SeedData.autostartLiveGame(context: context, stopped: false)
         }
+        // Stopped is halftime now: with the clock-flow header, the only
+        // way to be stopped mid-game (not transient full time) is at the
+        // break between halves, so both flags seed the same fixture.
         if args.contains("-autostartLiveGameStopped") {
+            SeedData.autostartLiveGame(context: context, stopped: true)
+        }
+        if args.contains("-autostartHalftime") {
             SeedData.autostartLiveGame(context: context, stopped: true)
         }
         if args.contains("-autostartLiveGameSetup") {

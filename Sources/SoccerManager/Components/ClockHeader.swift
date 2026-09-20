@@ -1,55 +1,87 @@
 import SwiftUI
 import SoccerManagerCore
 
-/// The Live screen's header: half picker, a countdown to the end of the
-/// half, a status subtitle, and the single Start/Stop control. Rendered as
-/// a card pinned above the scrolling field and bench lists; it never
-/// scrolls itself.
+/// The Live screen's header: a phase label or subtitle, a countdown, and,
+/// at kickoff and halftime, the single pill that starts the next half.
+/// Rendered as a card pinned above the scrolling field and bench lists; it
+/// never scrolls itself.
 ///
-/// The countdown never auto-stops: once elapsed time in the half reaches
-/// the configured half length it keeps counting as overtime, shown with a
-/// leading `+` in Algeria red. Every player's own stint and total keep
-/// counting up regardless, unaffected by this display.
+/// The countdown never auto-stops: once elapsed time in a running half
+/// reaches the configured half length it keeps counting as overtime, shown
+/// with a leading `+` in Algeria red. At kickoff and halftime the countdown
+/// always shows the full half length, a preview of what the next half will
+/// count down from, not a stale computation from the half that just ended.
+/// Every player's own stint and total keep counting up regardless.
 struct ClockHeader: View {
     let snapshot: GameSnapshot
-    @Binding var selectedHalf: Int
-    let onToggleClock: () -> Void
+    let phase: GamePhase
+    let onStartHalf: () -> Void
 
     @AppStorage(AppSettings.halfLengthMinutesKey)
     private var halfLengthMinutes = AppSettings.defaultHalfLengthMinutes
 
     private var halfLengthSeconds: TimeInterval { TimeInterval(halfLengthMinutes * 60) }
-    private var remaining: TimeInterval { halfLengthSeconds - snapshot.elapsedInHalf }
-    private var isOvertime: Bool { remaining <= 0 }
+
+    private var displaySeconds: TimeInterval {
+        switch phase {
+        case .kickoff, .halftime, .fullTime:
+            return halfLengthSeconds
+        case .firstHalf, .secondHalf:
+            return halfLengthSeconds - snapshot.elapsedInHalf
+        }
+    }
+
+    private var isOvertime: Bool {
+        switch phase {
+        case .firstHalf, .secondHalf: return displaySeconds <= 0
+        case .kickoff, .halftime, .fullTime: return false
+        }
+    }
+
+    /// The label shown below the countdown: "Kickoff" and "Halftime" name
+    /// the phase itself, while "1st half" and "2nd half" are plain
+    /// subtitles for the two running phases.
+    private var subtitle: String {
+        switch phase {
+        case .kickoff: return "Kickoff"
+        case .firstHalf: return "1st half"
+        case .halftime: return "Halftime"
+        case .secondHalf: return "2nd half"
+        case .fullTime: return "Full time"
+        }
+    }
+
+    /// The next-half pill's label, shown only at kickoff and halftime.
+    private var startButtonTitle: String? {
+        switch phase {
+        case .kickoff: return "Start 1st half"
+        case .halftime: return "Start 2nd half"
+        case .firstHalf, .secondHalf, .fullTime: return nil
+        }
+    }
 
     var body: some View {
         VStack(spacing: 2) {
-            Picker("Half", selection: $selectedHalf) {
-                Text("1st").tag(1)
-                Text("2nd").tag(2)
-            }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 150)
-            .disabled(snapshot.clockRunning)
-
             countdownText
                 .font(.system(size: 56, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .fixedSize()
 
-            Text("\(selectedHalf == 1 ? "1st half" : "2nd half") \u{00B7} \(snapshot.clockRunning ? "Running" : "Stopped")")
+            Text(subtitle)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            Button(action: onToggleClock) {
-                Text(snapshot.clockRunning ? "Stop" : "Start")
-                    .font(.title3.bold())
-                    .frame(maxWidth: .infinity, minHeight: 40)
+            if let startButtonTitle {
+                Button(action: onStartHalf) {
+                    Text(startButtonTitle)
+                        .font(.title3.bold())
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
+                .tint(Color.algeriaGreen)
+                .padding(.top, 2)
             }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.capsule)
-            .tint(snapshot.clockRunning ? Color.algeriaRed : Color.algeriaGreen)
-            .padding(.top, 2)
         }
         .padding(.horizontal)
         .padding(.top, 8)
@@ -68,10 +100,10 @@ struct ClockHeader: View {
     @ViewBuilder
     private var countdownText: some View {
         if isOvertime {
-            Text("+\(formatClock(-remaining))")
+            Text("+\(formatClock(-displaySeconds))")
                 .foregroundStyle(Color.algeriaRed)
         } else {
-            Text(formatClock(remaining))
+            Text(formatClock(displaySeconds))
                 .foregroundStyle(.primary)
         }
     }
@@ -80,14 +112,19 @@ struct ClockHeader: View {
 #Preview {
     VStack(spacing: 16) {
         ClockHeader(
-            snapshot: GameSnapshot(clockRunning: true, currentHalf: 1, elapsedInHalf: 754, elapsedTotal: 754),
-            selectedHalf: .constant(1),
-            onToggleClock: {}
+            snapshot: GameSnapshot(clockRunning: false, currentHalf: 1, elapsedInHalf: 0, elapsedTotal: 0),
+            phase: .kickoff,
+            onStartHalf: {}
         )
         ClockHeader(
-            snapshot: GameSnapshot(clockRunning: true, currentHalf: 2, elapsedInHalf: 1260, elapsedTotal: 1260),
-            selectedHalf: .constant(2),
-            onToggleClock: {}
+            snapshot: GameSnapshot(clockRunning: true, currentHalf: 1, elapsedInHalf: 754, elapsedTotal: 754),
+            phase: .firstHalf,
+            onStartHalf: {}
+        )
+        ClockHeader(
+            snapshot: GameSnapshot(clockRunning: false, currentHalf: 1, elapsedInHalf: 1200, elapsedTotal: 1200),
+            phase: .halftime,
+            onStartHalf: {}
         )
     }
     .background(Color(.systemGray6))
