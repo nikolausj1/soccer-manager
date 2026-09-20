@@ -16,9 +16,12 @@ enum Selection: Equatable {
 /// Undo. The only screen that mutates a game's event log directly.
 ///
 /// Layout is three fixed regions, not one scrolling page: `ClockHeader` is
-/// pinned above the scrolling field and bench lists, and Undo plus the
-/// End Game / Discard footer sit in a bottom `safeAreaInset` above the tab
-/// bar. Only the field and bench rows scroll.
+/// pinned above the scrolling field and bench lists, and Undo plus the End
+/// Game footer sit in a bottom `safeAreaInset` above the tab bar. Only the
+/// field and bench rows scroll. Field and bench rendering lives in
+/// `LiveGameView+Sections.swift`; the bottom bar and its dialogs live in
+/// `LiveGameView+Footer.swift`; the tap-resolution engine calls live in
+/// `LiveGameView+Actions.swift`.
 struct LiveGameView: View {
     let game: GameRecord
     var onFinished: (GameRecord) -> Void = { _ in }
@@ -26,12 +29,28 @@ struct LiveGameView: View {
     @Environment(\.modelContext) var context
     @Query var allPlayers: [PlayerRecord]
 
+    @AppStorage(AppSettings.shiftLengthMinutesKey)
+    var shiftLengthMinutes = AppSettings.defaultShiftLengthMinutes
+
     @State var selectedHalf = 1
     @State var selected: Selection?
-    @State private var showEndGameConfirm = false
-    @State private var showDiscardConfirm = false
+    @State var showEndGameConfirm = false
+    @State var showScoreSheet = false
+
+    /// The moment "End and save" was tapped, captured so the game's
+    /// recorded end time reflects that tap and not however long Justin
+    /// spends on the score sheet. `finish(game:at:)` only actually runs
+    /// once the sheet is dismissed (see `body`): flipping `isFinished`
+    /// any earlier would make `GamesView` swap this view out of the
+    /// hierarchy immediately, tearing down `showScoreSheet` before the
+    /// sheet ever gets a chance to present.
+    @State var pendingEndedAt: Date?
 
     var store: GameStore { GameStore(context: context) }
+
+    /// The target shift length players are ranked against, for the
+    /// readiness bars.
+    var shiftLengthSeconds: TimeInterval { TimeInterval(shiftLengthMinutes * 60) }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
@@ -44,18 +63,24 @@ struct LiveGameView: View {
                     selectedHalf: $selectedHalf,
                     onToggleClock: { toggleClock(snapshot: snapshot, now: timeline.date) }
                 )
-                .overlay(Divider(), alignment: .bottom)
 
                 ScrollView {
-                    VStack(spacing: 4) {
+                    VStack(spacing: 6) {
                         fieldSection(snapshot: snapshot, names: names)
                         benchSection(snapshot: snapshot, names: names)
                     }
-                    .padding(.vertical, 2)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
                 }
             }
             .safeAreaInset(edge: .bottom) {
                 bottomBar(snapshot: snapshot, names: names, now: timeline.date)
+            }
+            .sheet(isPresented: $showScoreSheet, onDismiss: {
+                store.finish(game: game, at: pendingEndedAt ?? .now)
+                onFinished(game)
+            }) {
+                ScoreSheet(game: game)
             }
         }
         .onAppear {
@@ -66,170 +91,18 @@ struct LiveGameView: View {
         .keepsScreenAwake(!game.isFinished)
     }
 
-    // MARK: - Sections
-
-    private func fieldSection(snapshot: GameSnapshot, names: [UUID: String]) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            sectionHeader("Field")
-
-            if let keeper = snapshot.keeper {
-                rowButton(.player(keeper), snapshot: snapshot) {
-                    PlayerRow(
-                        name: names[keeper] ?? "Unknown",
-                        stats: snapshot.stats[keeper] ?? PlayerStats(),
-                        isOnField: true,
-                        isKeeper: true,
-                        isSelected: selected == .player(keeper)
-                    )
-                }
-            } else {
-                rowButton(.keeperSlot, snapshot: snapshot) {
-                    PlaceholderSlotRow(label: "No keeper", isSelected: selected == .keeperSlot)
-                }
-            }
-
-            ForEach(Array(snapshot.rankedOutfield.enumerated()), id: \.element) { index, id in
-                rowButton(.player(id), snapshot: snapshot) {
-                    PlayerRow(
-                        name: names[id] ?? "Unknown",
-                        stats: snapshot.stats[id] ?? PlayerStats(),
-                        isOnField: true,
-                        statusBadge: index == 0 ? .nextOff : nil,
-                        isSelected: selected == .player(id)
-                    )
-                }
-            }
-
-            // The field holds `fieldSize` total including the keeper, so an
-            // empty keeper slot (the "No keeper" row above) already accounts
-            // for one of those slots and must not also count as an empty
-            // outfield slot.
-            let emptySlots = max(
-                0,
-                TeamConfig.fieldSize - snapshot.onField.count - (snapshot.keeper == nil ? 1 : 0)
-            )
-            ForEach(0..<emptySlots, id: \.self) { _ in
-                rowButton(.emptySlot, snapshot: snapshot) {
-                    PlaceholderSlotRow(label: "Empty slot", isSelected: selected == .emptySlot)
-                }
-            }
-        }
-        .padding(.horizontal)
-    }
-
-    private func benchSection(snapshot: GameSnapshot, names: [UUID: String]) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Button {
-                select(.benchHeader, in: snapshot, now: .now)
-            } label: {
-                HStack {
-                    sectionHeader("Bench")
-                        .foregroundStyle(selected == .benchHeader ? Color.accentColor : .secondary)
-                    Spacer()
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            ForEach(Array(snapshot.rankedBench.enumerated()), id: \.element) { index, id in
-                rowButton(.player(id), snapshot: snapshot) {
-                    PlayerRow(
-                        name: names[id] ?? "Unknown",
-                        stats: snapshot.stats[id] ?? PlayerStats(),
-                        statusBadge: index == 0 ? .nextOn : nil,
-                        isSelected: selected == .player(id)
-                    )
-                }
-            }
-        }
-        .padding(.horizontal)
-    }
-
-    private func sectionHeader(_ title: String) -> some View {
+    /// A section's caption-caps title, in `color` (normally secondary,
+    /// green while the bench header is the active selection).
+    func sectionHeader(_ title: String, color: Color = .secondary) -> some View {
         Text(title)
             .font(.caption.weight(.semibold))
             .textCase(.uppercase)
-            .foregroundStyle(.secondary)
-    }
-
-    // MARK: - Bottom bar
-
-    @ViewBuilder
-    private func bottomBar(snapshot: GameSnapshot, names: [UUID: String], now: Date) -> some View {
-        if snapshot.canUndo || !snapshot.clockRunning {
-            HStack(spacing: 8) {
-                if snapshot.canUndo {
-                    undoButton(snapshot: snapshot, names: names, now: now)
-                    footer(snapshot: snapshot)
-                } else {
-                    Spacer()
-                    footer(snapshot: snapshot)
-                    Spacer()
-                }
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 4)
-            .background(.thinMaterial)
-            .overlay(Divider(), alignment: .top)
-        }
-    }
-
-    /// Flexible: fills whatever space `footer` (compact, on the right)
-    /// leaves, truncating its own label rather than pushing the row taller.
-    private func undoButton(snapshot: GameSnapshot, names: [UUID: String], now: Date) -> some View {
-        Button {
-            store.undoLastLineup(in: game)
-            selected = nil
-        } label: {
-            Text(undoLabel(snapshot: snapshot, names: names, now: now))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.bordered)
-    }
-
-    @ViewBuilder
-    private func footer(snapshot: GameSnapshot) -> some View {
-        let hasClockStarted = game.events.contains { $0.kind == GameEvent.Kind.clockStart.rawValue }
-
-        if snapshot.clockRunning {
-            EmptyView()
-        } else if hasClockStarted {
-            Button("End Game") { showEndGameConfirm = true }
-                .buttonStyle(.borderedProminent)
-                .tint(.algeriaRed)
-                .confirmationDialog(
-                    "End this game?",
-                    isPresented: $showEndGameConfirm,
-                    titleVisibility: .visible
-                ) {
-                    Button("End Game", role: .destructive) {
-                        store.finish(game: game, at: .now)
-                        onFinished(game)
-                    }
-                    Button("Cancel", role: .cancel) {}
-                }
-        } else {
-            Button("Discard Game", role: .destructive) { showDiscardConfirm = true }
-                .buttonStyle(.bordered)
-                .tint(.algeriaRed)
-                .confirmationDialog(
-                    "Discard this game?",
-                    isPresented: $showDiscardConfirm,
-                    titleVisibility: .visible
-                ) {
-                    Button("Discard Game", role: .destructive) {
-                        store.discard(game: game)
-                    }
-                    Button("Cancel", role: .cancel) {}
-                }
-        }
+            .foregroundStyle(color)
     }
 
     /// Wraps a row in a plain-styled button that resolves the tap against
     /// `snapshot` when pressed.
-    private func rowButton(_ target: Selection, snapshot: GameSnapshot, @ViewBuilder content: () -> some View) -> some View {
+    func rowButton(_ target: Selection, snapshot: GameSnapshot, @ViewBuilder content: () -> some View) -> some View {
         Button {
             select(target, in: snapshot, now: .now)
         } label: {

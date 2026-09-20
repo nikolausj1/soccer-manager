@@ -11,6 +11,11 @@ struct RosterView: View {
     @State private var isAddingPlayer = false
     @State private var draftName = ""
 
+    @AppStorage(AppSettings.halfLengthMinutesKey)
+    private var halfLengthMinutes = AppSettings.defaultHalfLengthMinutes
+    @AppStorage(AppSettings.shiftLengthMinutesKey)
+    private var shiftLengthMinutes = AppSettings.defaultShiftLengthMinutes
+
     var body: some View {
         NavigationStack {
             Group {
@@ -22,19 +27,35 @@ struct RosterView: View {
                     }
                 } else {
                     List {
-                        ForEach(players) { player in
-                            Text(player.name)
-                                .font(.title3)
-                                .padding(.vertical, 4)
-                                .contentShape(Rectangle())
-                                .onTapGesture { startEditing(player) }
-                                .swipeActions {
-                                    Button("Archive") {
-                                        player.isArchived = true
-                                        try? context.save()
+                        Section {
+                            ForEach(players) { player in
+                                Text(player.name)
+                                    .font(.title3)
+                                    .padding(.vertical, 4)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { startEditing(player) }
+                                    .swipeActions {
+                                        Button("Archive") {
+                                            player.isArchived = true
+                                            try? context.save()
+                                        }
+                                        .tint(.orange)
                                     }
-                                    .tint(.orange)
-                                }
+                            }
+                        }
+                        Section("Settings") {
+                            Stepper(
+                                "Half length: \(halfLengthMinutes) min",
+                                value: $halfLengthMinutes,
+                                in: 5...45,
+                                step: 5
+                            )
+                            Stepper(
+                                "Shift length: \(shiftLengthMinutes) min",
+                                value: $shiftLengthMinutes,
+                                in: 1...15,
+                                step: 1
+                            )
                         }
                     }
                     .listStyle(.plain)

@@ -90,6 +90,7 @@ public enum GameEngine {
             for player in attendance where !onFieldSet.contains(player) {
                 if var playerStats = stats[player] {
                     playerStats.benchSeconds += duration
+                    playerStats.currentBenchStintSeconds = (playerStats.currentBenchStintSeconds ?? 0) + duration
                     stats[player] = playerStats
                 }
             }
@@ -127,13 +128,17 @@ public enum GameEngine {
                 let previousOnFieldSet = Set(onField)
                 let newOnFieldSet = Set(newOnField)
 
-                // A player newly on the field starts a fresh current stint.
+                // A player newly on the field starts a fresh current stint
+                // and stops resting.
                 for player in newOnField where !previousOnFieldSet.contains(player) {
                     stats[player]?.currentStintSeconds = 0
+                    stats[player]?.currentBenchStintSeconds = nil
                 }
-                // A player leaving the field has no current stint.
+                // A player leaving the field has no current stint, and
+                // starts a fresh bench stint.
                 for player in onField where !newOnFieldSet.contains(player) {
                     stats[player]?.currentStintSeconds = nil
+                    stats[player]?.currentBenchStintSeconds = 0
                 }
 
                 if newKeeper != keeper {
@@ -166,28 +171,35 @@ public enum GameEngine {
             attendanceIndex[player] = index
         }
 
+        // Longest current stint first: a player who just came on ranks
+        // behind everyone still mid-stint, even if their game total is
+        // higher, because a fresh stint means they are not due for a while.
         let rankedOutfield = outfield.sorted { a, b in
             let statsA = stats[a] ?? PlayerStats()
             let statsB = stats[b] ?? PlayerStats()
-            if statsA.fieldSeconds != statsB.fieldSeconds {
-                return statsA.fieldSeconds > statsB.fieldSeconds
-            }
             let stintA = statsA.currentStintSeconds ?? 0
             let stintB = statsB.currentStintSeconds ?? 0
             if stintA != stintB {
                 return stintA > stintB
             }
+            if statsA.fieldSeconds != statsB.fieldSeconds {
+                return statsA.fieldSeconds > statsB.fieldSeconds
+            }
             return (attendanceIndex[a] ?? Int.max) < (attendanceIndex[b] ?? Int.max)
         }
 
+        // Least game time first; among players tied on game time, whoever
+        // has been resting longest ranks first.
         let rankedBench = bench.sorted { a, b in
             let statsA = stats[a] ?? PlayerStats()
             let statsB = stats[b] ?? PlayerStats()
             if statsA.fieldSeconds != statsB.fieldSeconds {
                 return statsA.fieldSeconds < statsB.fieldSeconds
             }
-            if statsA.benchSeconds != statsB.benchSeconds {
-                return statsA.benchSeconds > statsB.benchSeconds
+            let restA = statsA.currentBenchStintSeconds ?? 0
+            let restB = statsB.currentBenchStintSeconds ?? 0
+            if restA != restB {
+                return restA > restB
             }
             return (attendanceIndex[a] ?? Int.max) < (attendanceIndex[b] ?? Int.max)
         }

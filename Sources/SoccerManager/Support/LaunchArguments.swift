@@ -29,5 +29,8 @@ enum LaunchArguments {
         if args.contains("-autostartLiveGameSetup") {
             SeedData.autostartLiveGameSetup(context: context)
         }
+        if args.contains("-autostartLiveGameOvertime") {
+            SeedData.autostartLiveGameOvertime(context: context)
+        }
     }
 }

@@ -42,6 +42,13 @@ struct GameStore {
         save()
     }
 
+    /// Sets `game`'s final score and saves immediately.
+    func setScore(ourScore: Int?, theirScore: Int?, for game: GameRecord) {
+        game.ourScore = ourScore
+        game.theirScore = theirScore
+        save()
+    }
+
     /// Deletes `game` and its events entirely. The only way to back out of
     /// a game created by mistake, before its clock has ever started.
     func discard(game: GameRecord) {

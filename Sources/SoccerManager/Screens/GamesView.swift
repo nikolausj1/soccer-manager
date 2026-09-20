@@ -5,11 +5,13 @@ import SoccerManagerCore
 /// The Game tab: the live game when one is in progress, otherwise a list of
 /// finished games newest first.
 struct GamesView: View {
+    @Environment(\.modelContext) private var context
     @Query(sort: \GameRecord.createdAt, order: .reverse) private var games: [GameRecord]
     @Query(filter: #Predicate<PlayerRecord> { !$0.isArchived }) private var activePlayers: [PlayerRecord]
 
     @State private var isPresentingNewGame = false
     @State private var justFinishedGame: GameRecord?
+    @State private var pendingDeleteGame: GameRecord?
 
     /// The most recently created game that is not yet finished, if any.
     /// `games` is already sorted newest first.
@@ -40,6 +42,12 @@ struct GamesView: View {
                         } label: {
                             GameRow(game: game)
                         }
+                        .swipeActions {
+                            Button("Delete", role: .destructive) {
+                                pendingDeleteGame = game
+                            }
+                            .tint(.algeriaRed)
+                        }
                     }
                     .listStyle(.plain)
                 }
@@ -59,6 +67,27 @@ struct GamesView: View {
             .navigationDestination(item: $justFinishedGame) { game in
                 GameSummaryView(game: game)
             }
+            // An `.alert`, not a `.confirmationDialog`: a confirmationDialog
+            // renders as a floating card whose bottom row can land behind
+            // the floating tab bar, while an alert is a centered modal
+            // nothing else can cover.
+            .alert(
+                "Delete this game?",
+                isPresented: Binding(
+                    get: { pendingDeleteGame != nil },
+                    set: { isPresented in if !isPresented { pendingDeleteGame = nil } }
+                )
+            ) {
+                Button("Delete", role: .destructive) {
+                    if let game = pendingDeleteGame {
+                        GameStore(context: context).discard(game: game)
+                    }
+                    pendingDeleteGame = nil
+                }
+                Button("Cancel", role: .cancel) { pendingDeleteGame = nil }
+            } message: {
+                Text("Season totals will update.")
+            }
         }
     }
 }
@@ -75,8 +104,15 @@ private struct GameRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(game.createdAt.formatted(date: .abbreviated, time: .omitted))
-                    .font(.headline)
+                HStack(spacing: 6) {
+                    Text(game.createdAt.formatted(date: .abbreviated, time: .omitted))
+                        .font(.headline)
+                    if let ourScore = game.ourScore, let theirScore = game.theirScore {
+                        Text("\(ourScore) - \(theirScore)")
+                            .font(.headline.monospacedDigit())
+                            .foregroundStyle(Color.algeriaGreen)
+                    }
+                }
                 Text("\(game.attendance.count) players")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)

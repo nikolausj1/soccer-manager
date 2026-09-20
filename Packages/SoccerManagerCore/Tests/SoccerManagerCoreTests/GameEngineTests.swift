@@ -262,7 +262,7 @@ final class GameEngineTests: XCTestCase {
 
     // MARK: - Ranking
 
-    func testRankedOutfieldSortsByFieldSecondsThenFallsBackToAttendanceOrder() {
+    func testRankedOutfieldSortsByCurrentStintSecondsThenFallsBackToAttendanceOrder() {
         let a = UUID()
         let b = UUID()
         let c = UUID()
@@ -272,21 +272,23 @@ final class GameEngineTests: XCTestCase {
         let events: [GameEvent] = [
             .clockStart(at: t(0), half: 1),
             .lineup(at: t(0), half: 1, onField: [a, b, c], keeper: nil),
-            // d joins later; nobody leaves.
+            // d joins later; nobody leaves, so a, b, c's stints run
+            // uninterrupted from the start and are not reset by this event.
             .lineup(at: t(100), half: 1, onField: [a, b, c, d], keeper: nil)
         ]
 
         let snapshot = GameEngine.snapshot(events: events, attendance: attendance, now: t(200))
 
-        // a, b, c are tied at 200s each and fall back to attendance order;
-        // d has only 100s and ranks last.
+        // a, b, c are tied at a 200s current stint (and 200s field seconds)
+        // and fall back to attendance order; d's stint only started at 100
+        // and ranks last.
         XCTAssertEqual(snapshot.rankedOutfield, [a, b, c, d])
         XCTAssertEqual(snapshot.nextOff, a)
         XCTAssertEqual(snapshot.stats[a]?.fieldSeconds, 200)
         XCTAssertEqual(snapshot.stats[d]?.fieldSeconds, 100)
     }
 
-    func testRankedOutfieldTiebreaksOnCurrentStintSecondsWhenFieldSecondsTie() {
+    func testRankedOutfieldSortsByCurrentStintSecondsWhenFieldSecondsTie() {
         let a = UUID()
         let b = UUID()
         let attendance = [a, b]
@@ -294,7 +296,9 @@ final class GameEngineTests: XCTestCase {
         // b plays straight through. a plays the first 70s, sits out the
         // stoppage (so the gap costs nobody any seconds), then returns for
         // a fresh 70s stint. Both end up with 140 field seconds, but only
-        // b's current stint spans the whole 140.
+        // b's current stint spans the whole 140, so b (the longer current
+        // stint) ranks first under the primary sort key even though the
+        // fieldSeconds tiebreak would not have distinguished them.
         let events: [GameEvent] = [
             .clockStart(at: t(0), half: 1),
             .lineup(at: t(0), half: 1, onField: [a, b], keeper: nil),
@@ -314,15 +318,41 @@ final class GameEngineTests: XCTestCase {
         XCTAssertEqual(snapshot.nextOff, b)
     }
 
+    func testRankedOutfieldTiebreaksOnFieldSecondsWhenCurrentStintSecondsTie() {
+        let a = UUID()
+        let b = UUID()
+        let attendance = [a, b]
+
+        // a plays 0-50, rests 50-90, then plays 90-160: a 70s current
+        // stint on top of an earlier 50s stint, for 120 field seconds
+        // total. b plays only 90-160, a 70s current stint that is also its
+        // entire field time. Both have a 70s current stint at the end, so
+        // the tiebreak, fieldSeconds descending, decides it: a's larger
+        // game total puts it first even though its current stint is no
+        // longer than b's.
+        let events: [GameEvent] = [
+            .clockStart(at: t(0), half: 1),
+            .lineup(at: t(0), half: 1, onField: [a], keeper: nil),
+            .lineup(at: t(50), half: 1, onField: [], keeper: nil),
+            .lineup(at: t(90), half: 1, onField: [a, b], keeper: nil)
+        ]
+
+        let snapshot = GameEngine.snapshot(events: events, attendance: attendance, now: t(160))
+
+        XCTAssertEqual(snapshot.stats[a]?.fieldSeconds, 120)
+        XCTAssertEqual(snapshot.stats[b]?.fieldSeconds, 70)
+        XCTAssertEqual(snapshot.stats[a]?.currentStintSeconds, 70)
+        XCTAssertEqual(snapshot.stats[b]?.currentStintSeconds, 70)
+        XCTAssertEqual(snapshot.rankedOutfield, [a, b])
+        XCTAssertEqual(snapshot.nextOff, a)
+    }
+
     func testRankedBenchSortsByFieldSecondsAscendingThenAttendanceOrder() {
-        // Within one game, every attending player's fieldSeconds plus
-        // benchSeconds equals the game's shared elapsedTotal, because each
-        // running second is credited to exactly one of the two buckets for
-        // every player. A fieldSeconds tie therefore always implies a
-        // benchSeconds tie too, so the benchSeconds-descending tiebreak can
-        // never itself discriminate within a single game; this test
-        // exercises the fallthrough to attendance order it produces, and
-        // separately checks the complementary-partition invariant.
+        // a and b never take the field, so both their fieldSeconds and
+        // their currentBenchStintSeconds tie (each equals the full elapsed
+        // time); this test exercises the fallthrough to attendance order
+        // that produces, and separately checks the complementary-partition
+        // invariant between fieldSeconds and benchSeconds.
         let a = UUID()
         let b = UUID()
         let c = UUID()
@@ -342,6 +372,8 @@ final class GameEngineTests: XCTestCase {
         XCTAssertEqual(snapshot.stats[a]?.benchSeconds, 100)
         XCTAssertEqual(snapshot.stats[b]?.benchSeconds, 100)
         XCTAssertEqual(snapshot.stats[c]?.benchSeconds, 50)
+        XCTAssertEqual(snapshot.stats[a]?.currentBenchStintSeconds, 100)
+        XCTAssertEqual(snapshot.stats[b]?.currentBenchStintSeconds, 100)
         XCTAssertEqual(snapshot.rankedBench, [a, b, c])
         XCTAssertEqual(snapshot.nextOn, a)
         for player in attendance {
@@ -351,6 +383,82 @@ final class GameEngineTests: XCTestCase {
                 snapshot.elapsedTotal
             )
         }
+    }
+
+    func testRankedBenchTiebreaksOnCurrentBenchStintSecondsWhenFieldSecondsTie() {
+        let a = UUID()
+        let b = UUID()
+        let attendance = [a, b]
+
+        // a is on the field 0-60, then rests from 60 onward (140s of rest
+        // by now). b is on the field 60-120, then rests from 120 onward
+        // (80s of rest by now). Both end up with 60 field seconds, but a
+        // has been resting longer, so a ranks first: most due to go back
+        // on.
+        let events: [GameEvent] = [
+            .clockStart(at: t(0), half: 1),
+            .lineup(at: t(0), half: 1, onField: [a], keeper: nil),
+            .lineup(at: t(60), half: 1, onField: [b], keeper: nil),
+            .lineup(at: t(120), half: 1, onField: [], keeper: nil)
+        ]
+
+        let snapshot = GameEngine.snapshot(events: events, attendance: attendance, now: t(200))
+
+        XCTAssertEqual(snapshot.stats[a]?.fieldSeconds, 60)
+        XCTAssertEqual(snapshot.stats[b]?.fieldSeconds, 60)
+        XCTAssertEqual(snapshot.stats[a]?.currentBenchStintSeconds, 140)
+        XCTAssertEqual(snapshot.stats[b]?.currentBenchStintSeconds, 80)
+        XCTAssertEqual(snapshot.rankedBench, [a, b])
+        XCTAssertEqual(snapshot.nextOn, a)
+    }
+
+    // MARK: - Bench stint
+
+    func testCurrentBenchStintSecondsResetsToZeroOnLeavingFieldAndAccumulatesOnlyWhileRunning() {
+        let p1 = UUID()
+        let attendance = [p1]
+
+        // Before any event at all, p1 has not yet appeared in a lineup and
+        // so is on the bench by default: the stint is 0, not nil.
+        let beforeAnything = GameEngine.snapshot(events: [], attendance: attendance, now: t(0))
+        XCTAssertEqual(beforeAnything.stats[p1]?.currentBenchStintSeconds, 0)
+
+        let baseEvents: [GameEvent] = [.clockStart(at: t(0), half: 1)]
+
+        // The clock runs for 40s with p1 still on the bench: the stint
+        // accumulates.
+        let stillBenched = GameEngine.snapshot(events: baseEvents, attendance: attendance, now: t(40))
+        XCTAssertEqual(stillBenched.stats[p1]?.currentBenchStintSeconds, 40)
+
+        // p1 takes the field: the bench stint becomes nil, the field stint
+        // starts at 0.
+        let enterEvent = GameEvent.lineup(at: t(40), half: 1, onField: [p1], keeper: nil)
+        let onField = GameEngine.snapshot(events: baseEvents + [enterEvent], attendance: attendance, now: t(70))
+        XCTAssertNil(onField.stats[p1]?.currentBenchStintSeconds)
+        XCTAssertEqual(onField.stats[p1]?.currentStintSeconds, 30)
+
+        // The clock stops, then p1 leaves the field back to the bench: the
+        // new bench stint starts at zero.
+        let stopEvent = GameEvent.clockStop(at: t(70), half: 1)
+        let leaveEvent = GameEvent.lineup(at: t(70), half: 1, onField: [], keeper: nil)
+        let justLeft = GameEngine.snapshot(
+            events: baseEvents + [enterEvent, stopEvent, leaveEvent],
+            attendance: attendance,
+            now: t(200)
+        )
+        // The clock is stopped, so none of the 130 seconds of wall-clock
+        // time since accrues to the fresh bench stint.
+        XCTAssertFalse(justLeft.clockRunning)
+        XCTAssertEqual(justLeft.stats[p1]?.currentBenchStintSeconds, 0)
+
+        // The clock resumes: the bench stint accumulates again, from zero.
+        let restartEvent = GameEvent.clockStart(at: t(200), half: 1)
+        let resumed = GameEngine.snapshot(
+            events: baseEvents + [enterEvent, stopEvent, leaveEvent, restartEvent],
+            attendance: attendance,
+            now: t(225)
+        )
+        XCTAssertEqual(resumed.stats[p1]?.currentBenchStintSeconds, 25)
     }
 
     func testKeeperExcludedFromRankedOutfield() {

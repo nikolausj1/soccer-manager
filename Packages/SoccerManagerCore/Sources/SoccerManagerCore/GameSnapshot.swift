@@ -26,15 +26,23 @@ public struct PlayerStats: Equatable, Sendable {
     /// Running-clock time spent on the bench.
     public var benchSeconds: TimeInterval
 
+    /// Running-clock time accumulated since this player most recently left
+    /// the field, or since the start of the game for a player who begins
+    /// on the bench. Every attending player starts a game with `0` here,
+    /// not nil, because nobody is on the field until the first lineup
+    /// event. Nil while the player is currently on the field.
+    public var currentBenchStintSeconds: TimeInterval?
+
     /// Creates player stats, defaulting to a player who has not yet
-    /// appeared in any lineup.
+    /// appeared in any lineup and so starts the game on the bench.
     public init(
         fieldSeconds: TimeInterval = 0,
         keeperSeconds: TimeInterval = 0,
         keeperStints: Int = 0,
         currentStintSeconds: TimeInterval? = nil,
         currentKeeperStintSeconds: TimeInterval? = nil,
-        benchSeconds: TimeInterval = 0
+        benchSeconds: TimeInterval = 0,
+        currentBenchStintSeconds: TimeInterval? = 0
     ) {
         self.fieldSeconds = fieldSeconds
         self.keeperSeconds = keeperSeconds
@@ -42,6 +50,7 @@ public struct PlayerStats: Equatable, Sendable {
         self.currentStintSeconds = currentStintSeconds
         self.currentKeeperStintSeconds = currentKeeperStintSeconds
         self.benchSeconds = benchSeconds
+        self.currentBenchStintSeconds = currentBenchStintSeconds
     }
 }
 
@@ -71,13 +80,16 @@ public struct GameSnapshot: Equatable, Sendable {
     /// Players currently on the bench, in attendance order.
     public var bench: [UUID]
 
-    /// On-field players excluding the keeper, ranked most-played first:
-    /// `fieldSeconds` descending, then `currentStintSeconds` descending,
-    /// then attendance order.
+    /// On-field players excluding the keeper, ranked longest-on first:
+    /// `currentStintSeconds` descending, then `fieldSeconds` descending,
+    /// then attendance order. A short current stint means a player only
+    /// just came on, even if their game total is high, so it leads the
+    /// ranking instead of only breaking ties in it.
     public var rankedOutfield: [UUID]
 
     /// Bench players ranked least-played first: `fieldSeconds` ascending,
-    /// then `benchSeconds` descending, then attendance order.
+    /// then `currentBenchStintSeconds` descending (longest rested first),
+    /// then attendance order.
     public var rankedBench: [UUID]
 
     /// The outfield player due to come off next, that is `rankedOutfield`'s

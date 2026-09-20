@@ -21,6 +21,18 @@ struct GameSummaryView: View {
             .sorted { $0.1.fieldSeconds > $1.1.fieldSeconds }
 
         List {
+            if let ourScore = game.ourScore, let theirScore = game.theirScore {
+                Section {
+                    HStack {
+                        Spacer()
+                        Text("\(TeamConfig.name) \(ourScore) - \(theirScore) Opponent")
+                            .font(.headline.monospacedDigit())
+                            .foregroundStyle(Color.algeriaGreen)
+                        Spacer()
+                    }
+                }
+                .listRowBackground(Color.clear)
+            }
             Section {
                 ForEach(rows, id: \.0) { id, stats in
                     HStack {

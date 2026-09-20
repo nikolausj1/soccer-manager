@@ -1,11 +1,12 @@
 import SwiftUI
 
 extension Color {
-    /// Algeria flag green: accent color, the NEXT ON highlight, and the GK
-    /// badge.
+    /// Algeria flag green: accent color, the NEXT ON and GK badges, a
+    /// ready (under 0.6 of a shift) readiness bar, and row selection.
     static let algeriaGreen = Color(red: 0, green: 0.384, blue: 0.2)
 
-    /// Algeria flag red: the NEXT OFF highlight.
+    /// Algeria flag red: overtime, a DUE readiness badge, and destructive
+    /// actions.
     static let algeriaRed = Color(red: 0.824, green: 0.063, blue: 0.204)
 }
 
