@@ -2,7 +2,7 @@
 title: "STATUS - Soccer Manager"
 created: 2026-09-19
 modified: 2026-09-19
-version: 1.3
+version: 1.4
 author: Claude Fable 5.1 (claude-fable-5-1)
 tags:
 ---
@@ -19,7 +19,7 @@ MVP
 
 ## Health
 
-🟢 On-track. v1.1 on Justin's iPhone as of 2026-09-19: countdown, readiness scale for 5-minute shifts, settings, delete and discard, optional score. 26 engine tests green. Not yet used in a real game.
+🟢 On-track. v1.2 on Justin's iPhone as of 2026-09-19: whistle-driven clock (Start 1st half, End Half, Start 2nd half, End Game with confirming alerts), readiness meters on field and bench, pushed live screen with Back and no tab bar, settings, delete, optional score. 26 engine tests green. Not yet used in a real game.
 
 ## Waiting on Me
 
@@ -28,7 +28,7 @@ MVP
 
 ## Next Up
 
-1. Justin runs one real game on v1.1 and reports.
+1. Justin runs one real game on v1.2 and reports.
 2. Triage the report into v1.1 (Ideas Shelf has the candidates).
 3. Free disk space, install the iOS 27 simulator runtime, raise the deployment floor to 27.
 
@@ -50,6 +50,7 @@ Locked decisions from the interrogation; see `PRD.md` for full detail on each.
 - **Silent in the pocket, no alerts, screen stays awake during a live game.** Justin decides when to look, the app never buzzes him.
 - **One team, one season, on-device only, no accounts or sync.** Nothing to sync to yet; iCloud is a v3 candidate, not a v1 cost.
 - **iPhone only, SwiftUI, SwiftData, portrait, no third-party packages.** Bundle ID `com.levelup.soccermanager`, repo `nikolausj1/soccer-manager`, public (Justin's call).
+- **Whistle-driven clock, no pause (v1.2).** Start 1st half, End Half, Start 2nd half, End Game, each end confirmed by an alert so a stray tap cannot end anything; an injury stoppage runs on the clock. Live screen is pushed with a Back button and no tab bar. Justin's call after the second hands-on, 2026-09-19.
 - **Readiness scale replaces "next off" (v1.1).** Kids play 5-minute shifts, so field rows rank by longest current stint with a bar against the shift length and a DUE badge; bench keeps least-played-first. Half length and shift length are settings. Justin's call after the first hands-on, 2026-09-19.
 - **Team identity is Algeria, palette is the flag** (green `#006233`, red `#D21034`, white background). Set by Justin 2026-09-19; see PRD.md Section 7. The team name is not personal information, so it lives in a plain source constant, unlike the kids' names.
 
@@ -64,6 +65,7 @@ Locked decisions from the interrogation; see `PRD.md` for full detail on each.
 ## Ideas Shelf
 
 - **Tune readiness thresholds** (S): the 60 percent amber point is a guess; adjust after two games.
+- **Pause for injuries** (S): a hold-to-pause behind the countdown, only if a real stoppage ever matters.
 - **Backdate-last-swap chips** (S): quick "actually 2 minutes ago" correction for a late tap, instead of full history editing.
 - **Gap-from-even display** (S): show "+3" / "-4" beside or instead of raw game totals on the Live screen.
 - **Lock-screen Live Activity** (M): half, elapsed, next off, next on, visible without unlocking.
