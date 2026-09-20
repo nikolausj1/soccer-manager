@@ -2,7 +2,7 @@
 title: "STATUS - Soccer Manager"
 created: 2026-09-19
 modified: 2026-09-19
-version: 1.4
+version: 1.5
 author: Claude Fable 5.1 (claude-fable-5-1)
 tags:
 ---
@@ -19,7 +19,7 @@ MVP
 
 ## Health
 
-🟢 On-track. v1.2 on Justin's iPhone as of 2026-09-19: whistle-driven clock (Start 1st half, End Half, Start 2nd half, End Game with confirming alerts), readiness meters on field and bench, pushed live screen with Back and no tab bar, settings, delete, optional score. 26 engine tests green. Not yet used in a real game.
+🟢 On-track. v1.2.1 on Justin's iPhone as of 2026-09-19 (two time columns per row): whistle-driven clock (Start 1st half, End Half, Start 2nd half, End Game with confirming alerts), readiness meters on field and bench, pushed live screen with Back and no tab bar, settings, delete, optional score. 26 engine tests green. Not yet used in a real game.
 
 ## Waiting on Me
 
@@ -28,7 +28,7 @@ MVP
 
 ## Next Up
 
-1. Justin runs one real game on v1.2 and reports.
+1. Justin runs one real game on v1.2.1 and reports.
 2. Triage the report into v1.1 (Ideas Shelf has the candidates).
 3. Free disk space, install the iOS 27 simulator runtime, raise the deployment floor to 27.
 
